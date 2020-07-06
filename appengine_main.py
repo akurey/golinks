@@ -1,4 +1,4 @@
-from google.appengine.ext.webapp.template import render
+from google.appengine.ext.webapp.template import render, register_template_library
 from google.appengine.ext import ndb
 from google.appengine.api import users, memcache
 from googleapiclient.errors import HttpError
@@ -7,6 +7,10 @@ import logging
 import webapp2
 import config
 import gsuite
+
+from third_party import xsrfutil
+
+register_template_library('third_party.xsrfutil')
 
 
 class Link(ndb.Model):
@@ -24,15 +28,25 @@ def errorPage(response, code, message):
   response.set_status(code)
 
 
+def check_redirect(func):
+
+  def decorate(self, *args, **kwargs):
+    if config.ALWAYS_REDIRECT_TO_FQDN and self.request.host != config.GOLINKS_FQDN:
+      url = self.request.url.replace(self.request.host, config.GOLINKS_FQDN, 1)
+      return self.redirect(url)
+    return func(self, *args, **kwargs)
+
+  return decorate
+
+
 def isValidUrl(url):
   o = urlparse(url)
-  if o.scheme in config.URL_ALLOWED_SCHEMAS:
-    return 1
-  return 0
+  return o.scheme in config.URL_ALLOWED_SCHEMAS
 
 
 class ShowLinks(webapp2.RequestHandler):
 
+  @check_redirect
   def get(self, param):
     user = users.get_current_user()
     if not user:
@@ -56,7 +70,9 @@ class ShowLinks(webapp2.RequestHandler):
 
 class DeleteLink(webapp2.RequestHandler):
 
-  def get(self, link):
+  @check_redirect
+  @xsrfutil.xsrf_protect
+  def post(self, link):
     user = users.get_current_user()
     if not user:
       self.redirect(users.create_login_url(self.request.path))
@@ -76,6 +92,8 @@ class DeleteLink(webapp2.RequestHandler):
 
 class EditLink(webapp2.RequestHandler):
 
+  @check_redirect
+  @xsrfutil.xsrf_protect
   def post(self, link):
     user = users.get_current_user()
     if not user:
@@ -146,6 +164,7 @@ class EditLink(webapp2.RequestHandler):
     logging.info("%s created or updated /%s to %s" % (user.email(), key, url))
     self.redirect("/edit/" + key)
 
+  @check_redirect
   def get(self, link):
     user = users.get_current_user()
     if not user:
@@ -185,6 +204,7 @@ class EditLink(webapp2.RequestHandler):
 
 class RedirectLink(webapp2.RequestHandler):
 
+  @check_redirect
   def get(self, link):
     user = users.get_current_user()
     if link:
@@ -194,10 +214,10 @@ class RedirectLink(webapp2.RequestHandler):
         if l.public:
           username = "public-user"
         else:
-          username = user.email()
           if not user:
             self.redirect(users.create_login_url(self.request.path))
             return
+          username = user.email()
           if l.visibility:
             if config.ENABLE_GOOGLE_GROUPS_INTEGRATION:
               memcacheKey = "v_%s_%s" % (user.user_id(), link)
@@ -208,8 +228,8 @@ class RedirectLink(webapp2.RequestHandler):
                   if group:
                     try:
                       # NOTES: this does support nested group members but doesn't support external users
-                      # even though we don't currently allow external users to log in, but this is worth noting if we decide to support
-                      # See b/109861216 and https://github.com/googleapis/google-api-go-client/issues/350
+                      # even though we don't currently allow external users to log in, this is worth
+                      # noting if we decide to support
                       logging.info("Checking if %s is a member of %s" %
                                    (username, group))
                       if gsuite.directory_service.members().hasMember(
