@@ -62,15 +62,16 @@ G Suite integration
 7. Visit the domain you just set, and enjoy :-)
 
 ## Google Groups Integration
-We support integration with Google Groups for more advanced access control on top of 
-regular G Suite integration. For each link, you can specify users in which internal Google 
+We support integration with Google Groups for more advanced access control on top of
+regular G Suite integration. For each link, you can specify users in which internal Google
 Group have access.
 
 To set up Google Groups Integration, follow the following steps:
 1. Turn on `ENABLE_GOOGLE_GROUPS_INTEGRATION` in `config.py` and set `GSUITE_DIRECTORY_ADMIN_USER`
 to a G Suite admin user in your domain.
 2. Go to [Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) settings for your
-GCP project and create a new service account (you don't need to grant any GCP project or user access to
+GCP project (For this project in Akurey.com domain, go to [Golinks service account settings](https://console.cloud.google.com/iam-admin/serviceaccounts/details/115234215995309945556?folder=&organizationId=&project=golinksservice&supportedpurview=project
+) and create a new service account (you don't need to grant any GCP project or user access to
 the service account); enable `G Suite Domain-wide Delegation` for it. Download json format
 key and put it as `credentials.json` in your GAE project root.
 3. Go to [G Suite Admin](https://admin.google.com), select `Security`, `Advanced Setttings`,
